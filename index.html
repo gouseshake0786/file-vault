@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FileVault — GitHub File Manager</title>
+  <style>
+    /* ── Tokens ── */
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --accent:   #58a6ff;
+      --accent2:  #3fb950;
+      --danger:   #f85149;
+      --warn:     #d29922;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --radius:   10px;
+      --font:     'Inter', system-ui, sans-serif;
+      --mono:     'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo svg { width: 22px; height: 22px; }
+    .header-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .repo-badge {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(88,166,255,.12);
+      color: var(--accent);
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(88,166,255,.25);
+    }
+    #settingsBtn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 34px; height: 34px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color .15s, color .15s;
+    }
+    #settingsBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+    main { flex: 1; padding: 28px 24px; max-width: 960px; margin: 0 auto; width: 100%; }
+
+    /* ── Setup banner ── */
+    #setupBanner {
+      background: linear-gradient(135deg, rgba(88,166,255,.08), rgba(63,185,80,.06));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    #setupBanner h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    #setupBanner p { color: var(--muted); max-width: 480px; margin: 0 auto 24px; }
+    .setup-fields { display: flex; flex-direction: column; gap: 12px; max-width: 440px; margin: 0 auto; }
+    .setup-fields label { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .setup-fields input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .setup-fields input:focus { border-color: var(--accent); }
+    .setup-fields input::placeholder { color: var(--muted); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-success { background: var(--accent2); color: #0d1117; }
+    .btn-danger  { background: rgba(248,81,73,.15); color: var(--danger); border: 1px solid rgba(248,81,73,.3); }
+    .btn-ghost   { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm      { padding: 5px 10px; font-size: 12px; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .toolbar-right { margin-left: auto; display: flex; gap: 8px; }
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 160px;
+      max-width: 320px;
+    }
+    .search-box svg {
+      position: absolute;
+      left: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    .search-box input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px 8px 34px;
+      border-radius: 8px;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-box input:focus { border-color: var(--accent); }
+
+    /* ── Upload zone ── */
+    #dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    #dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(88,166,255,.05);
+    }
+    #dropzone input[type=file] {
+      position: absolute; inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%; height: 100%;
+    }
+    #dropzone .dz-icon { font-size: 32px; margin-bottom: 8px; }
+    #dropzone .dz-label { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    #dropzone .dz-sub   { font-size: 12px; color: var(--muted); }
+
+    /* ── Upload queue ── */
+    #uploadQueue { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .upload-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .upload-item .fi-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .upload-item .fi-size { color: var(--muted); font-family: var(--mono); font-size: 12px; min-width: 60px; text-align: right; }
+    .upload-progress {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .upload-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width .3s;
+    }
+    .upload-status { font-size: 11px; min-width: 70px; text-align: right; }
+    .upload-status.done    { color: var(--accent2); }
+    .upload-status.error   { color: var(--danger); }
+    .upload-status.pending { color: var(--warn); }
+
+    /* ── File list ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .file-count { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface); padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); }
+
+    #fileList { display: flex; flex-direction: column; gap: 2px; }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      transition: background .12s, border-color .12s;
+      cursor: default;
+    }
+    .file-row:hover { background: var(--surface); border-color: var(--border); }
+    .file-icon { font-size: 18px; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 1px; }
+    .file-actions { display: flex; gap: 6px; flex-shrink: 0; opacity: 0; transition: opacity .15s; }
+    .file-row:hover .file-actions { opacity: 1; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-backdrop.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 520px;
+      padding: 28px;
+      transform: translateY(12px);
+      transition: transform .2s;
+    }
+    .modal-backdrop.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .modal p  { color: var(--muted); margin-bottom: 22px; font-size: 13px; }
+    .modal-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+    .modal-fields label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 5px; }
+    .modal-fields input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .modal-fields input:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Toast ── */
+    #toastContainer {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .toast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn .25s ease;
+      max-width: 340px;
+    }
+    .toast.success { border-color: rgba(63,185,80,.4); }
+    .toast.error   { border-color: rgba(248,81,73,.4); }
+    .toast.info    { border-color: rgba(88,166,255,.4); }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ── Empty state ── */
+    #emptyState {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+    }
+    #emptyState .es-icon { font-size: 48px; margin-bottom: 12px; }
+    #emptyState p { font-size: 14px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Folder path breadcrumb ── */
+    .breadcrumb { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 16px; font-family: var(--mono); }
+    .breadcrumb a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .breadcrumb span { color: var(--border); }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      header { padding: 12px 16px; }
+      main   { padding: 20px 16px; }
+      .file-actions { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>
+      </svg>
+      FileVault
+    </div>
+    <span id="repoBadge" class="repo-badge" style="display:none"></span>
+    <div class="header-meta">
+      <button id="settingsBtn" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Setup Banner (shown when no config) -->
+    <div id="setupBanner">
+      <h2>Connect your GitHub repository</h2>
+      <p>Enter your GitHub credentials once. They are saved locally in your browser and never sent to any third party — only to the GitHub API.</p>
+      <div class="setup-fields">
+        <div>
+          <label>GitHub Username</label>
+          <input id="cfgOwner" type="text" placeholder="gouseshake0786" />
+        </div>
+        <div>
+          <label>Repository Name</label>
+          <input id="cfgRepo" type="text" placeholder="file-vault" />
+        </div>
+        <div>
+          <label>Branch</label>
+          <input id="cfgBranch" type="text" placeholder="main" value="main" />
+        </div>
+        <div>
+          <label>Personal Access Token (PAT)</label>
+          <input id="cfgToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+        </div>
+        <div>
+          <label>Storage folder inside repo (optional)</label>
+          <input id="cfgFolder" type="text" placeholder="uploads" value="uploads" />
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:4px">Connect Repository →</button>
+      </div>
+      <p style="margin-top:16px;font-size:11px;">
+        <a href="https://github.com/settings/tokens/new?scopes=repo&description=FileVault" target="_blank" style="color:var(--accent)">Create a PAT here</a> — needs <code>repo</code> scope.
+      </p>
+    </div>
+
+    <!-- Main UI (hidden until configured) -->
+    <div id="mainUI" style="display:none">
+
+      <div class="breadcrumb">
+        <a onclick="navigate('')">root</a>
+        <span>/</span>
+        <span id="currentFolder">uploads</span>
+      </div>
+
+      <!-- Upload Zone -->
+      <div id="dropzone">
+        <input type="file" id="fileInput" multiple />
+        <div class="dz-icon">📁</div>
+        <div class="dz-label">Drop files here or click to browse</div>
+        <div class="dz-sub">Supports any file type</div>
+      </div>
+
+      <!-- Upload Queue -->
+      <div id="uploadQueue"></div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="searchInput" placeholder="Filter files…" oninput="filterFiles()" />
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-ghost btn-sm" onclick="loadFiles()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- File List -->
+      <div class="section-header">
+        <span class="section-title">Files</span>
+        <span class="file-count" id="fileCount">0 files</span>
+      </div>
+
+      <div id="fileList">
+        <div id="loadingState" style="text-align:center;padding:40px 0">
+          <div class="spinner" style="margin:0 auto 12px"></div>
+          <div style="color:var(--muted);font-size:13px">Loading files…</div>
+        </div>
+      </div>
+
+      <div id="emptyState" style="display:none">
+        <div class="es-icon">🗄️</div>
+        <p>No files yet. Upload something above.</p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    Built with the <a href="https://docs.github.com/en/rest" target="_blank">GitHub REST API</a> · Hosted on <a href="https://pages.github.com" target="_blank">GitHub Pages</a>
+  </footer>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <h3>⚙️ Settings</h3>
+    <p>Update your GitHub connection. Changes are saved locally.</p>
+    <div class="modal-fields">
+      <div>
+        <label>GitHub Username</label>
+        <input id="sOwner" type="text" />
+      </div>
+      <div>
+        <label>Repository</label>
+        <input id="sRepo" type="text" />
+      </div>
+      <div>
+        <label>Branch</label>
+        <input id="sBranch" type="text" />
+      </div>
+      <div>
+        <label>Personal Access Token</label>
+        <input id="sToken" type="password" placeholder="Leave blank to keep existing" />
+      </div>
+      <div>
+        <label>Storage Folder</label>
+        <input id="sFolder" type="text" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="clearConfig()" style="margin-right:auto">Disconnect</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-backdrop" id="deleteModal">
+  <div class="modal">
+    <h3>Delete file?</h3>
+    <p id="deleteModalMsg">This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn">Delete permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
+<script>
+/* ──────────────────────────────────────────
+   CONFIG
+────────────────────────────────────────── */
+const LS_KEY = 'filevault_cfg';
+let cfg = null;
+let allFiles = [];
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) cfg = JSON.parse(raw);
+  } catch(e) { cfg = null; }
+}
+
+function saveConfig() {
+  const owner  = document.getElementById('cfgOwner').value.trim();
+  const repo   = document.getElementById('cfgRepo').value.trim();
+  const branch = document.getElementById('cfgBranch').value.trim() || 'main';
+  const token  = document.getElementById('cfgToken').value.trim();
+  const folder = document.getElementById('cfgFolder').value.trim().replace(/^\/|\/$/g,'') || 'uploads';
+
+  if (!owner || !repo || !token) { toast('Please fill in all required fields.', 'error'); return; }
+
+  cfg = { owner, repo, branch, token, folder };
+  localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+  init();
+}
+
+function saveSettings() {
+  const owner  = document.getElementById('sOwner').value.trim();
+  const repo   = document.getElementById('sRepo').value.trim();
+  const branch = document.getElementById('sBranch').value.trim() || 'main';
+  const rawTok = document.getElementById('sToken').value.trim();
+  const folder = document.getElementById('sFolder').value.trim().replace(/^\/|\/$/g,'') || 'uploads';
+  const token  = rawTok || cfg.token;
+
+  if (!owner || !repo || !token) { toast('Owner, repo and token are required.', 'error'); return; }
+
+  cfg = { owner, repo, branch, token, folder };
+  localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+  closeModal('settingsModal');
+  toast('Settings saved!', 'success');
+  init();
+}
+
+function clearConfig() {
+  localStorage.removeItem(LS_KEY);
+  cfg = null;
+  closeModal('settingsModal');
+  showSetup();
+}
+
+/* ──────────────────────────────────────────
+   INIT
+────────────────────────────────────────── */
+function init() {
+  if (!cfg) { showSetup(); return; }
+  document.getElementById('setupBanner').style.display = 'none';
+  document.getElementById('mainUI').style.display = 'block';
+  document.getElementById('repoBadge').style.display = 'inline';
+  document.getElementById('repoBadge').textContent = `${cfg.owner}/${cfg.repo}`;
+  document.getElementById('currentFolder').textContent = cfg.folder;
+  loadFiles();
+}
+
+function showSetup() {
+  document.getElementById('setupBanner').style.display = 'block';
+  document.getElementById('mainUI').style.display = 'none';
+  document.getElementById('repoBadge').style.display = 'none';
+}
+
+/* ──────────────────────────────────────────
+   GITHUB API HELPERS
+────────────────────────────────────────── */
+async function ghFetch(path, options = {}) {
+  const url = `https://api.github.com${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': `token ${cfg.token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    let msg = `GitHub API error ${res.status}`;
+    try { const j = await res.json(); msg = j.message || msg; } catch(_) {}
+    throw new Error(msg);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+/* ──────────────────────────────────────────
+   FILE LISTING
+────────────────────────────────────────── */
+async function loadFiles() {
+  if (!cfg) return;
+  setListLoading(true);
+  try {
+    const path = `/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.folder}`;
+    const data = await ghFetch(`${path}?ref=${cfg.branch}`);
+    allFiles = Array.isArray(data) ? data.filter(f => f.type === 'file') : [];
+    renderFiles(allFiles);
+  } catch(e) {
+    if (e.message.includes('404') || e.message.toLowerCase().includes('not found')) {
+      allFiles = [];
+      renderFiles([]);
+    } else {
+      toast(e.message, 'error');
+    }
+    setListLoading(false);
+  }
+}
+
+function setListLoading(on) {
+  document.getElementById('loadingState').style.display = on ? 'block' : 'none';
+}
+
+function renderFiles(files) {
+  setListLoading(false);
+  const list = document.getElementById('fileList');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('fileCount');
+
+  // clear existing rows (keep loading state node)
+  Array.from(list.children).forEach(c => {
+    if (c.id !== 'loadingState') c.remove();
+  });
+
+  count.textContent = `${files.length} file${files.length !== 1 ? 's' : ''}`;
+
+  if (files.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  files.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.dataset.name = f.name.toLowerCase();
+    const ext = f.name.split('.').pop().toLowerCase();
+    const icon = fileIcon(ext);
+    const size = formatSize(f.size);
+    row.innerHTML = `
+      <span class="file-icon">${icon}</span>
+      <div class="file-info">
+        <div class="file-name">${escHtml(f.name)}</div>
+        <div class="file-meta">${size} · ${escHtml(f.path)}</div>
+      </div>
+      <div class="file-actions">
+        <a href="${escHtml(f.download_url)}" download="${escHtml(f.name)}" class="btn btn-ghost btn-sm" title="Download">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </a>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${escHtml(f.name)}','${escHtml(f.sha)}')" title="Delete">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Delete
+        </button>
+      </div>`;
+    list.appendChild(row);
+  });
+}
+
+function filterFiles() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = allFiles.filter(f => f.name.toLowerCase().includes(q));
+  renderFiles(filtered);
+}
+
+/* ──────────────────────────────────────────
+   UPLOAD
+────────────────────────────────────────── */
+document.getElementById('fileInput').addEventListener('change', e => {
+  handleFiles(Array.from(e.target.files));
+  e.target.value = '';
+});
+
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  handleFiles(Array.from(e.dataTransfer.files));
+});
+
+async function handleFiles(files) {
+  if (!cfg) { toast('Connect a repository first.', 'error'); return; }
+  for (const file of files) {
+    await uploadFile(file);
+  }
+  setTimeout(loadFiles, 600);
+}
+
+async function uploadFile(file) {
+  const itemId = 'ui_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  const queue = document.getElementById('uploadQueue');
+
+  const item = document.createElement('div');
+  item.className = 'upload-item';
+  item.id = itemId;
+  item.innerHTML = `
+    <span style="font-size:18px">${fileIcon(file.name.split('.').pop().toLowerCase())}</span>
+    <div style="flex:1;min-width:0">
+      <div class="fi-name">${escHtml(file.name)}</div>
+      <div class="upload-progress"><div class="upload-progress-bar" style="width:0%"></div></div>
+    </div>
+    <span class="fi-size">${formatSize(file.size)}</span>
+    <span class="upload-status pending" id="${itemId}_status">Pending</span>`;
+  queue.appendChild(item);
+
+  const bar = item.querySelector('.upload-progress-bar');
+  const statusEl = document.getElementById(`${itemId}_status`);
+
+  try {
+    bar.style.width = '30%';
+    statusEl.textContent = 'Reading…';
+
+    const content = await readFileAsBase64(file);
+    bar.style.width = '60%';
+    statusEl.textContent = 'Uploading…';
+
+    const filePath = `${cfg.folder}/${file.name}`;
+
+    // Check if file exists (to get SHA for update)
+    let sha;
+    try {
+      const existing = await ghFetch(`/repos/${cfg.owner}/${cfg.repo}/contents/${filePath}?ref=${cfg.branch}`);
+      sha = existing.sha;
+    } catch(_) { sha = undefined; }
+
+    const body = {
+      message: `Upload ${file.name} via FileVault`,
+      content,
+      branch: cfg.branch,
+    };
+    if (sha) body.sha = sha;
+
+    await ghFetch(`/repos/${cfg.owner}/${cfg.repo}/contents/${filePath}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+
+    bar.style.width = '100%';
+    bar.style.background = 'var(--accent2)';
+    statusEl.textContent = 'Done ✓';
+    statusEl.className = 'upload-status done';
+    toast(`Uploaded ${file.name}`, 'success');
+  } catch(e) {
+    bar.style.width = '100%';
+    bar.style.background = 'var(--danger)';
+    statusEl.textContent = 'Failed';
+    statusEl.className = 'upload-status error';
+    toast(`Failed to upload ${file.name}: ${e.message}`, 'error');
+  }
+
+  setTimeout(() => { item.remove(); }, 4000);
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ──────────────────────────────────────────
+   DELETE
+────────────────────────────────────────── */
+function confirmDelete(name, sha) {
+  document.getElementById('deleteModalMsg').textContent = `Delete "${name}"? This cannot be undone.`;
+  document.getElementById('confirmDeleteBtn').onclick = () => deleteFile(name, sha);
+  openModal('deleteModal');
+}
+
+async function deleteFile(name, sha) {
+  closeModal('deleteModal');
+  try {
+    await ghFetch(`/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.folder}/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({
+        message: `Delete ${name} via FileVault`,
+        sha,
+        branch: cfg.branch,
+      }),
+    });
+    toast(`Deleted ${name}`, 'success');
+    loadFiles();
+  } catch(e) {
+    toast(`Delete failed: ${e.message}`, 'error');
+  }
+}
+
+/* ──────────────────────────────────────────
+   UTILS
+────────────────────────────────────────── */
+function fileIcon(ext) {
+  const map = {
+    pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊',
+    ppt:'📋', pptx:'📋', txt:'📃', md:'📃',
+    jpg:'🖼️', jpeg:'🖼️', png:'🖼️', gif:'🖼️', svg:'🖼️', webp:'🖼️', ico:'🖼️',
+    mp4:'🎬', mov:'🎬', avi:'🎬', mkv:'🎬', webm:'🎬',
+    mp3:'🎵', wav:'🎵', flac:'🎵', ogg:'🎵',
+    zip:'🗜️', rar:'🗜️', gz:'🗜️', tar:'🗜️', '7z':'🗜️',
+    js:'⚡', ts:'⚡', jsx:'⚡', tsx:'⚡',
+    py:'🐍', rb:'💎', go:'🐹', rs:'🦀',
+    html:'🌐', css:'🎨', json:'📦', xml:'📦', csv:'📊',
+    sh:'⚙️', yaml:'⚙️', yml:'⚙️',
+  };
+  return map[ext] || '📁';
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B','KB','MB','GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ──────────────────────────────────────────
+   MODALS
+────────────────────────────────────────── */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-backdrop').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  if (!cfg) { toast('No configuration yet — use the setup form.', 'info'); return; }
+  document.getElementById('sOwner').value  = cfg.owner;
+  document.getElementById('sRepo').value   = cfg.repo;
+  document.getElementById('sBranch').value = cfg.branch;
+  document.getElementById('sToken').value  = '';
+  document.getElementById('sFolder').value = cfg.folder;
+  openModal('settingsModal');
+});
+
+/* ──────────────────────────────────────────
+   TOAST
+────────────────────────────────────────── */
+function toast(msg, type = 'info') {
+  const icons = { success:'✅', error:'❌', info:'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span> ${escHtml(msg)}`;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ──────────────────────────────────────────
+   NAVIGATION (placeholder for subfolders)
+────────────────────────────────────────── */
+function navigate(folder) {
+  if (!folder) folder = cfg ? cfg.folder : 'uploads';
+  document.getElementById('currentFolder').textContent = folder;
+  loadFiles();
+}
+
+/* ──────────────────────────────────────────
+   BOOT
+────────────────────────────────────────── */
+loadConfig();
+init();
+</script>
+</body>
+</html>
